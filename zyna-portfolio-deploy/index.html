@@ -380,7 +380,7 @@ const ART={
 // ===== Lưu/đọc ảnh đã tải lên (chạy khi trang cho phép) =====
 let saved={},AS=null,DB=null,canEdit=false;
 const slots=()=>[...document.querySelectorAll("[data-slot]")];
-function paint(){slots().forEach(e=>{const k=e.dataset.slot;e.style.backgroundImage=saved[k]?`url("${blobUrl(saved[k])}")`:(ART[k]||ART[k[0]==="a"?"a0":"p3"])})}
+function paint(){slots().forEach(e=>{const k=e.dataset.slot;e.style.backgroundImage=saved[k]?`url("${blobUrl(saved[k])}")`:(ART[k]||ART[k[0]==="a"?"a0":k[0]==="e"?"lab":"p3"])})}
 function toast(t){const e=$("toast");e.textContent=t;e.style.display="block";setTimeout(()=>e.style.display="none",2200)}
 paint();
 function initSlots(){slots().forEach(e=>{if(e.querySelector(":scope>.uplbtn"))return;const b=document.createElement("div");b.className="uplbtn";b.innerHTML="<button>Tải ảnh lên</button><button>Mặc định</button>";
@@ -405,7 +405,7 @@ $("editfab").onclick=()=>{document.body.classList.toggle("edit");$("editfab").te
  if(!window.claude)return;
  DB=await claude.use("db");AS=await claude.use("assets");if(!DB)return;
  const s=await DB.doc("site/images").get();if(s.exists){saved=s.data()||{};paint()}
- const c=await DB.doc("site/content").get();if(c.exists){const d=c.data();if(d.projects)P.splice(0,P.length,...d.projects);if(d.articles)A.splice(0,A.length,...d.articles);refresh()}
+ const c=await DB.doc("site/content").get();if(c.exists){const d=c.data();if(d.projects)P.splice(0,P.length,...d.projects);if(d.articles)A.splice(0,A.length,...d.articles);if(d.experiments)E.splice(0,E.length,...d.experiments);refresh()}
  try{const q=await DB.doc('site/appearance').get();if(q.exists){app=Object.assign({},APP0,q.data());applyApp();appSaved=JSON.stringify(app)}}catch(e){}
  route();
  if(AS){canEdit=true;$("editfab").style.display="block";$("adminfab").style.display="block"}
@@ -439,8 +439,8 @@ const bodyToText=b=>b.map(x=>x[0]==="h"?"## "+x[1]:x[0]==="ul"?x[1].map(i=>"- "+
 function textToBody(t){const out=[];lines(t).forEach(l=>{if(l.startsWith("## "))out.push(["h",l.slice(3)]);else if(l.startsWith("- ")){const last=out[out.length-1];if(last&&last[0]==="ul")last[1].push(l.slice(2));else out.push(["ul",[l.slice(2)]])}else out.push(["p",l])});return out}
 const FP=[["title","Tên dự án"],["cat","Nhóm (vd: Computer Vision)"],["year","Năm"],["tags","Công nghệ (cách nhau bằng dấu phẩy)"],["summary","Tóm tắt","t"],["problem","Bài toán","t"],["method","Phương pháp (mỗi dòng một bước)","t"],["results","Kết quả (mỗi dòng: Tên | Giá trị)","t"],["github","Link GitHub"],["report","Link báo cáo / slide"]];
 const FA=[["title","Tiêu đề"],["cat","Chủ đề"],["date","Ngày (vd: 12 Sep 2026)"],["excerpt","Mô tả ngắn","t"],["body","Nội dung — dùng ## cho tiêu đề mục, - cho gạch đầu dòng, dòng trống giữa các đoạn","t","big"]];
-const toForm=(k,o)=>k==="p"?{title:o.title,cat:o.cat,year:o.year,tags:o.tags.join(", "),summary:o.summary,problem:o.problem,method:o.method.join("\n"),results:o.results.map(r=>r.join(" | ")).join("\n"),github:o.links.github,report:o.links.report}:{title:o.title,cat:o.cat,date:o.date,excerpt:o.excerpt,body:bodyToText(o.body)};
-const fromForm=(k,f)=>k==="p"?{title:f.title,cat:f.cat||"Khác",year:+f.year||new Date().getFullYear(),tags:f.tags.split(",").map(x=>x.trim()).filter(Boolean),summary:f.summary,problem:f.problem,method:lines(f.method),results:lines(f.results).map(l=>{const r=l.split("|").map(x=>x.trim());return[r[0],r[1]||""]}),links:{github:f.github||"#",report:f.report||"#"}}:{title:f.title,cat:f.cat||"Khác",date:f.date,excerpt:f.excerpt,body:textToBody(f.body)};
+const toForm=(k,o)=>k==="l"?toFormL(o):k==="p"?{title:o.title,cat:o.cat,year:o.year,tags:o.tags.join(", "),summary:o.summary,problem:o.problem,method:o.method.join("\n"),results:o.results.map(r=>r.join(" | ")).join("\n"),github:o.links.github,report:o.links.report}:{title:o.title,cat:o.cat,date:o.date,excerpt:o.excerpt,body:bodyToText(o.body)};
+const fromForm=(k,f)=>k==="l"?fromFormL(f):k==="p"?{title:f.title,cat:f.cat||"Khác",year:+f.year||new Date().getFullYear(),tags:f.tags.split(",").map(x=>x.trim()).filter(Boolean),summary:f.summary,problem:f.problem,method:lines(f.method),results:lines(f.results).map(l=>{const r=l.split("|").map(x=>x.trim());return[r[0],r[1]||""]}),links:{github:f.github||"#",report:f.report||"#"}}:{title:f.title,cat:f.cat||"Khác",date:f.date,excerpt:f.excerpt,body:textToBody(f.body)};
 function refresh(){renderHome();initSlots();paint()}
 // ===== Supabase (điền URL + anon key khi deploy ở Phase 9; để trống = dùng lưu trữ tạm) =====
 const SB={url:"",key:""};const sbOn=!!(SB.url&&SB.key);let sbToken=null;
@@ -457,33 +457,33 @@ async function adopt(j){sbToken=j.access_token;sess.set({rt:j.refresh_token});se
 async function refreshTok(){const s=sess.get();if(!s)return;try{await adopt(await sbAuth('refresh_token',{refresh_token:s.rt}))}catch(e){logout(true)}}
 async function afterAuth(){if(await sbIsAdmin()){canEdit=true;$('editfab').style.display='block';$('adminfab').style.display='block';return true}await logout(true);return false}
 async function logout(quiet){if(!sbOn){toast('Bản xem thử: bạn đang đăng nhập qua claude.ai');return}try{if(sbToken)await fetch(`${SB.url}/auth/v1/logout`,{method:'POST',headers:sbH()})}catch(e){}sbToken=null;sess.set(null);canEdit=false;$('editfab').style.display=$('adminfab').style.display='none';document.body.classList.remove('edit');if(!quiet){toast('Đã đăng xuất');location.hash='#home'}}
-async function sbInit(){const [p,a]=await Promise.all([sbGet("projects?select=*&order=sort.desc"),sbGet("articles?select=*&order=sort.desc")]);if(p.length)P.splice(0,P.length,...p);if(a.length)A.splice(0,A.length,...a);sanitize(P,'p');sanitize(A,'a');try{const s=await sbGet("settings?key=eq.images");if(s[0])saved=s[0].value||{}}catch(e){}
+async function sbInit(){const [p,a]=await Promise.all([sbGet("projects?select=*&order=sort.desc"),sbGet("articles?select=*&order=sort.desc")]);if(p.length)P.splice(0,P.length,...p);if(a.length)A.splice(0,A.length,...a);try{const ex=await sbGet('experiments?select=*&order=sort.desc');if(ex.length)E.splice(0,E.length,...ex)}catch(e){}sanitize(P,'p');sanitize(A,'a');sanitize(E,'e');try{const s=await sbGet("settings?key=eq.images");if(s[0])saved=s[0].value||{}}catch(e){}
  try{const q=await sbGet('settings?key=eq.appearance');if(q[0]){app=Object.assign({},APP0,q[0].value);applyApp();appSaved=JSON.stringify(app)}}catch(e){}
  const rs=sess.get();if(rs){try{await adopt(await sbAuth('refresh_token',{refresh_token:rs.rt}));await afterAuth()}catch(e){sess.set(null)}}
  refresh();route()}
-async function saveContent(){sanitize(P,'p');sanitize(A,'a');refresh();try{if(sbOn){await sbSync("projects",P);await sbSync("articles",A)}else await DB.doc("site/content").set({projects:P,articles:A});toast("Đã lưu")}catch(e){toast("Không lưu được: "+(e.code||e.message))}}
-function pageAdmin(k,idx){k=k||"p";if(k==="m")return pageMessages();if(k==="g"&&canEdit)return pageAppearance();const L=k==="p"?P:A;
+async function saveContent(){sanitize(P,'p');sanitize(A,'a');sanitize(E,'e');refresh();try{if(sbOn){await sbSync("projects",P);await sbSync("articles",A);await sbSync("experiments",E)}else await DB.doc("site/content").set({projects:P,articles:A,experiments:E});toast("Đã lưu")}catch(e){toast("Không lưu được: "+(e.code||e.message))}}
+function pageAdmin(k,idx){k=k||"p";if(k==="m")return pageMessages();if(k==="g"&&canEdit)return pageAppearance();const L=k==="p"?P:k==="l"?E:A;
  if(!canEdit){view.innerHTML='<div class="wrap pg"><h1>Dashboard</h1><p class="lead">Bạn cần đăng nhập tài khoản quản trị để chỉnh sửa nội dung.</p><a class="btn fill" href="#/login">Đăng nhập</a> <a class="btn line" href="#home">Về trang chủ</a></div>';return}
- const tabs=`<div class="tabs"><button class="mini ${k==="p"?"pink":""}" data-k="p">Dự án (${P.length})</button><button class="mini ${k==="a"?"pink":""}" data-k="a">Bài viết (${A.length})</button><button class="mini" data-k="m">Tin nhắn</button><button class="mini" data-k="g">Giao diện</button><button class="mini" id="lo2" style="margin-left:auto">Đăng xuất</button></div>`;
- if(idx==null){view.innerHTML=`<div class="wrap pg"><a class="back" href="#home">← Xem website</a><h1>Dashboard</h1>${tabs}<button class="btn fill" id="add">+ Thêm ${k==="p"?"dự án":"bài viết"}</button><div style="margin-top:20px">${L.map((o,i)=>`<div class="glass row"><div><b>${esc(o.title)}</b><small>${esc(o.cat)} · ${esc(k==="p"?o.year:o.date)}</small></div><div class="ac"><button class="mini" data-e="${i}">Sửa</button><button class="mini red" data-d="${i}">Xóa</button></div></div>`).join("")||'<p class="lead">Chưa có mục nào.</p>'}</div></div>`;
+ const tabs=`<div class="tabs"><button class="mini ${k==="p"?"pink":""}" data-k="p">Dự án (${P.length})</button><button class="mini ${k==="a"?"pink":""}" data-k="a">Bài viết (${A.length})</button><button class="mini ${k==="l"?"pink":""}" data-k="l">Lab (${E.length})</button><button class="mini" data-k="m">Tin nhắn</button><button class="mini" data-k="g">Giao diện</button><button class="mini" id="lo2" style="margin-left:auto">Đăng xuất</button></div>`;
+ if(idx==null){view.innerHTML=`<div class="wrap pg"><a class="back" href="#home">← Xem website</a><h1>Dashboard</h1>${tabs}<button class="btn fill" id="add">+ Thêm ${k==="p"?"dự án":k==="l"?"thí nghiệm":"bài viết"}</button><div style="margin-top:20px">${L.map((o,i)=>`<div class="glass row"><div><b>${esc(o.title)}</b><small>${esc(o.cat)} · ${esc(k==="p"?o.year:o.date)}</small></div><div class="ac"><button class="mini" data-e="${i}">Sửa</button><button class="mini red" data-d="${i}">Xóa</button></div></div>`).join("")||'<p class="lead">Chưa có mục nào.</p>'}</div></div>`;
   view.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>pageAdmin(b.dataset.k));
   $("add").onclick=()=>pageAdmin(k,-1);$("lo2").onclick=()=>logout();
   view.querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>pageAdmin(k,+b.dataset.e));
   view.querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{if(b.dataset.s!=="1"){b.dataset.s="1";b.textContent="Chắc chắn?";return}L.splice(+b.dataset.d,1);await saveContent();pageAdmin(k)});return}
- const F=k==="p"?FP:FA,cur=idx>=0?toForm(k,L[idx]):{};
- view.innerHTML=`<div class="wrap pg"><a class="back" href="#/admin" id="bk">← Quay lại danh sách</a><h1>${idx>=0?"Sửa":"Thêm"} ${k==="p"?"dự án":"bài viết"}</h1><div class="form">${F.map(f=>`<label>${f[1]}${f[2]?`<textarea name="${f[0]}" style="${f[3]?"min-height:320px":""}">${esc(cur[f[0]])}</textarea>`:`<input name="${f[0]}" value="${esc(cur[f[0]])}">`}</label>`).join("")}<small>Ảnh bìa: bật “✎ Chỉnh ảnh” rồi tải ảnh lên trên website.</small>${k==="p"?'<label>Ảnh / video demo<div id="mbox"></div><button type="button" class="mini pink" id="madd" style="justify-self:start">+ Tải ảnh/video lên</button><input type="file" id="mpick" multiple accept="image/*,video/mp4,video/webm" hidden><small>Ảnh tối đa 5 MB, video MP4/WebM tối đa 50 MB.</small></label>':""}<div class="ac" style="display:flex;gap:10px"><button class="btn fill" id="sv">Lưu</button><button class="btn line" id="cn">Hủy</button></div></div></div>`;
+ const F=k==="p"?FP:k==="l"?FL:FA,cur=idx>=0?toForm(k,L[idx]):{};
+ view.innerHTML=`<div class="wrap pg"><a class="back" href="#/admin" id="bk">← Quay lại danh sách</a><h1>${idx>=0?"Sửa":"Thêm"} ${k==="p"?"dự án":k==="l"?"thí nghiệm":"bài viết"}</h1><div class="form">${F.map(f=>`<label>${f[1]}${f[2]?`<textarea name="${f[0]}" style="${f[3]?"min-height:320px":""}">${esc(cur[f[0]])}</textarea>`:`<input name="${f[0]}" value="${esc(cur[f[0]])}">`}</label>`).join("")}<small>Ảnh bìa: bật “✎ Chỉnh ảnh” rồi tải ảnh lên trên website.</small>${k!=="a"?'<label>Ảnh / video demo<div id="mbox"></div><button type="button" class="mini pink" id="madd" style="justify-self:start">+ Tải ảnh/video lên</button><input type="file" id="mpick" multiple accept="image/*,video/mp4,video/webm" hidden><small>Ảnh tối đa 5 MB, video MP4/WebM tối đa 50 MB.</small></label>':""}<div class="ac" style="display:flex;gap:10px"><button class="btn fill" id="sv">Lưu</button><button class="btn line" id="cn">Hủy</button></div></div></div>`;
  $("cn").onclick=$("bk").onclick=e=>{e.preventDefault();pageAdmin(k)};
- let mm=k==="p"?[...((idx>=0&&L[idx].media)||[])]:[];
+ let mm=k!=="a"?[...((idx>=0&&L[idx].media)||[])]:[];
  const drawM=()=>{const b=$("mbox");if(!b)return;b.innerHTML=mm.map((m,i)=>`<div class="row glass" style="padding:8px 12px;margin:0"><small>${m.t==="video"?"🎬":"🖼"} ${esc(m.u.split("/").pop().slice(0,40))}</small><button type="button" class="mini red" data-x="${i}">Xóa</button></div>`).join("");b.querySelectorAll("[data-x]").forEach(x=>x.onclick=()=>{mm.splice(+x.dataset.x,1);drawM()})};
- if(k==="p"){drawM();$("madd").onclick=()=>$("mpick").click();$("mpick").onchange=async ev=>{const fs=[...ev.target.files];ev.target.value="";for(let n=0;n<fs.length;n++){const f=fs[n],bad=validateFile(f);if(bad){toast(bad);continue}toast(`Đang tải lên ${n+1}/${fs.length}…`);try{mm.push({t:f.type.startsWith("video")?"video":"image",u:await uploadFile(f)});drawM()}catch(er){toast("Lỗi tải lên: "+(er.message||er))}}toast("Xong — nhớ bấm Lưu")}}
+ if(k!=="a"){drawM();$("madd").onclick=()=>$("mpick").click();$("mpick").onchange=async ev=>{const fs=[...ev.target.files];ev.target.value="";for(let n=0;n<fs.length;n++){const f=fs[n],bad=validateFile(f);if(bad){toast(bad);continue}toast(`Đang tải lên ${n+1}/${fs.length}…`);try{mm.push({t:f.type.startsWith("video")?"video":"image",u:await uploadFile(f)});drawM()}catch(er){toast("Lỗi tải lên: "+(er.message||er))}}toast("Xong — nhớ bấm Lưu")}}
  $("sv").onclick=async()=>{const f={};view.querySelectorAll("[name]").forEach(x=>f[x.name]=x.value);if(!f.title.trim()){toast("Cần nhập tiêu đề");return}
-  const o=fromForm(k,f);if(k==="p")o.media=mm;if(idx>=0)Object.assign(L[idx],o);else{let s=slugify(f.title),n=s,c=2;while(L.some(x=>x.slug===n))n=s+"-"+c++;L.unshift({id:k+Date.now(),slug:n,...o})}
+  const o=fromForm(k,f);if(k!=="a")o.media=mm;if(idx>=0)Object.assign(L[idx],o);else{let s=slugify(f.title),n=s,c=2;while(L.some(x=>x.slug===n))n=s+"-"+c++;L.unshift({id:(k==="l"?"e":k)+Date.now(),slug:n,...o})}
   await saveContent();pageAdmin(k)}}
 
 // ===== Bảo mật nội dung: loại ký tự HTML, chỉ cho phép link http(s) =====
 const clean=v=>typeof v==='string'?v.replace(/[<>]/g,''):Array.isArray(v)?v.map(clean):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,clean(x)])):v;
 const safeUrl=u=>/^(https?:\/\/[^\s"'<>]+|#|\/_blob\/[\w-]+)$/.test(u||'')?u:'#';
-function sanitize(L,k){L.forEach((o,i)=>{o=L[i]=clean(o);o.slug=String(o.slug||'').replace(/[^a-z0-9-]/g,'')||'muc';o.id=String(o.id||'').replace(/[^\w-]/g,'');if(k==='p'){o.links={github:safeUrl(o.links&&o.links.github),report:safeUrl(o.links&&o.links.report)};o.media=(o.media||[]).filter(m=>safeUrl(m.u)!=='#'&&(m.t==='video'||m.t==='image'))}})}
+function sanitize(L,k){L.forEach((o,i)=>{o=L[i]=clean(o);o.slug=String(o.slug||'').replace(/[^a-z0-9-]/g,'')||'muc';o.id=String(o.id||'').replace(/[^\w-]/g,'');if(k==='p'||k==='e'){o.links={github:safeUrl(o.links&&o.links.github),report:safeUrl(o.links&&o.links.report)};o.media=(o.media||[]).filter(m=>safeUrl(m.u)!=='#'&&(m.t==='video'||m.t==='image'))}})}
 
 // ===== Trang đăng nhập =====
 let fails=0,lockUntil=0,lastSend=0;
@@ -540,7 +540,7 @@ function pageAppearance(){const a=app;a.order=fullOrder();a.sections=a.sections|
 let labRaf=0;
 const mk=(id,l,a,b,s,v)=>`<label>${l}<input type="range" id="${id}" min="${a}" max="${b}" step="${s}" value="${v}"><output id="${id}o">${v}</output></label>`;
 const cv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-function pageLab(){cancelAnimationFrame(labRaf);
+function pageLabSims(){cancelAnimationFrame(labRaf);
  view.innerHTML=`<div class="wrap pg"><a class="back" href="#home">← Trang chủ</a><h1>My Lab / Experiments</h1><p class="lead">Các mô phỏng tương tác chạy ngay trên trình duyệt — kéo thanh trượt để xem hệ thống phản ứng.</p><div class="labgrid">
 <div class="glass labc"><h2>Bộ điều khiển PID</h2><p>Hệ khối lượng–lò xo–giảm chấn bám theo giá trị đặt (nét đứt). Đường hồng là đầu ra.</p><canvas id="pidc" width="640" height="260"></canvas><div class="sl">${mk('kp','Kp',0,20,0.1,6)}${mk('ki','Ki',0,20,0.1,2)}${mk('kd','Kd',0,10,0.1,2.5)}</div><div class="stat" id="pids"></div></div>
 <div class="glass labc"><h2>Gradient Descent</h2><p>Tối ưu hàm loss dạng bát bầu dục. Thử tăng learning rate đến khi phân kỳ, hoặc thêm momentum.</p><canvas id="gdc" width="640" height="260"></canvas><div class="sl">${mk('lr','Learning rate',0.01,0.25,0.01,0.05)}${mk('mo','Momentum',0,0.95,0.05,0)}<button class="mini pink" id="gdr" style="justify-self:start">Chạy lại</button></div><div class="stat" id="gds"></div></div></div></div>`;
@@ -567,6 +567,25 @@ function pageLab(){cancelAnimationFrame(labRaf);
    if(isFinite(L)&&L<1e6&&L>1e-4&&it<400)labRaf=requestAnimationFrame(step)};step()};
  $('lr').onchange=$('mo').onchange=$('gdr').onclick=startGd;$('lr').oninput=()=>$('lro').textContent=$('lr').value;$('mo').oninput=()=>$('moo').textContent=$('mo').value;startGd()}
 
+// ===== Lab: mỗi thí nghiệm có trang riêng =====
+const E=[
+ {id:'e0',slug:'pid-controller',title:'Bộ điều khiển PID',cat:'Mô phỏng',date:'Oct 2026',tags:['Control','PID','JavaScript'],sim:'pid',summary:'Mô phỏng tương tác bộ điều khiển PID cho hệ khối lượng–lò xo–giảm chấn.',links:{github:'#'},media:[],body:[['h','Mô hình'],['p','Hệ bậc hai m·x\'\' + c·x\' + k·x = u với m=1, c=1, k=2. Bộ PID tính u từ sai số e = r − x.'],['h','Gợi ý thử nghiệm'],['ul',['Chỉ dùng Kp: hệ ổn định nhưng còn sai số xác lập','Thêm Ki để triệt tiêu sai số','Thêm Kd để giảm vọt lố']]]},
+ {id:'e1',slug:'gradient-descent',title:'Gradient Descent',cat:'Mô phỏng',date:'Oct 2026',tags:['Optimization','Machine Learning'],sim:'gd',summary:'Quan sát gradient descent và momentum trên hàm loss dạng bát bầu dục.',links:{github:'#'},media:[],body:[['h','Bài toán'],['p','Cực tiểu hóa f(x, y) = ½(x² + 10y²). Điều kiện số xấu khiến gradient descent dao động theo trục y.'],['h','Gợi ý'],['ul',['Learning rate từ 0.2 trở lên: không hội tụ vì độ cong lớn nhất bằng 10','Momentum giúp đi nhanh dọc trục dài nhưng có thể vượt qua cực tiểu']]]},
+ {id:'e2',slug:'arduino-sensors',title:'Arduino & Sensors',cat:'Phần cứng',date:'2026',tags:['Arduino','C++','Sensors'],summary:'Thí nghiệm với cảm biến và vi điều khiển Arduino.',links:{github:'#'},media:[],body:[['p','Bản nháp mẫu — bạn sẽ viết lại bằng thí nghiệm thật trong Dashboard.'],['h','Mục tiêu'],['p','Mô tả bạn muốn đo hay điều khiển điều gì.']]},
+ {id:'e3',slug:'matlab-simulation',title:'MATLAB Simulation',cat:'Mô phỏng',date:'2026',tags:['MATLAB','COMSOL'],summary:'Mô phỏng hệ thống và trường điện từ bằng MATLAB và COMSOL.',links:{github:'#'},media:[],body:[['p','Bản nháp mẫu — thêm kết quả và hình ảnh mô phỏng thật của bạn.']]},
+ {id:'e4',slug:'pytorch-experiments',title:'PyTorch Experiments',cat:'Machine Learning',date:'2026',tags:['PyTorch','Computer Vision'],summary:'Các thí nghiệm huấn luyện mô hình với PyTorch.',links:{github:'#'},media:[],body:[['p','Bản nháp mẫu — thêm mô hình, dữ liệu và kết quả bạn đã chạy.']]}];
+const FL=[['title','Tên thí nghiệm'],['cat','Nhóm (vd: Mô phỏng, Phần cứng)'],['date','Thời gian (vd: Oct 2026)'],['tags','Công nghệ (cách nhau bằng dấu phẩy)'],['summary','Tóm tắt','t'],['github','Link GitHub'],['body','Nội dung — ## cho tiêu đề mục, - cho gạch đầu dòng, dòng trống giữa các đoạn','t','big']];
+function toFormL(o){return{title:o.title,cat:o.cat,date:o.date,tags:(o.tags||[]).join(', '),summary:o.summary,github:(o.links&&o.links.github)||'',body:bodyToText(o.body||[])}}
+function fromFormL(f){return{title:f.title,cat:f.cat||'Thí nghiệm',date:f.date,tags:f.tags.split(',').map(x=>x.trim()).filter(Boolean),summary:f.summary,links:{github:f.github||'#'},body:textToBody(f.body)}}
+const bodyHtml=b=>b.map(x=>x[0]==='h'?`<h2>${x[1]}</h2>`:x[0]==='ul'?`<ul>${x[1].map(i=>`<li>${i}</li>`).join('')}</ul>`:`<p>${x[1]}</p>`).join('');
+function pageLab(){cancelAnimationFrame(labRaf);
+ view.innerHTML=`<div class="wrap pg"><a class="back" href="#home">← Trang chủ</a><h1>My Lab / Experiments</h1><p class="lead">Nơi mình thử ý tưởng, mô phỏng và xây những thứ thú vị. Mỗi thí nghiệm có trang riêng.</p><div class="pgrid">${E.map(e=>`<a href="#/lab/${e.slug}" class="glass pc"><div class="thumb" data-slot="${e.id}"></div><div class="b"><h3>${e.title}</h3><p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">${e.sim?'▶ Mô phỏng tương tác · ':''}${e.cat} · ${e.date}</p><div class="tags">${tg(e.tags)}</div></div></a>`).join('')||'<p class="lead">Chưa có thí nghiệm nào.</p>'}</div></div>`}
+function pageLabSim(e){pageLabSims();const cs=view.querySelectorAll('.labc');cs[e.sim==='pid'?1:0].classList.add('off');view.querySelector('.labgrid').style.gridTemplateColumns='1fr';
+ const a=view.querySelector('.back');a.href='#/lab';a.textContent='← Phòng Lab';view.querySelector('h1').textContent=e.title;view.querySelector('.lead').textContent=e.summary;
+ view.querySelector('.pg').insertAdjacentHTML('beforeend',`<div class="post" style="margin-top:24px">${bodyHtml(e.body)}</div>${(e.media&&e.media.length)?mediaHtml(e):''}`)}
+function pageLabItem(slug){const e=E.find(x=>x.slug===slug);if(!e)return pageLab();if(e.sim)return pageLabSim(e);
+ view.innerHTML=`<div class="wrap pg"><a class="back" href="#/lab">← Phòng Lab</a><br><span class="badge">${e.cat}</span><h1>${e.title}</h1><p class="meta">${e.date}</p><p class="lead">${e.summary}</p><div class="cover" data-slot="${e.id}"></div><div class="tags">${tg(e.tags)}</div><div class="post" style="margin-top:20px">${bodyHtml(e.body)}</div><h2 style="margin-top:26px;font-size:1.25rem">Ảnh / Video</h2>${mediaHtml(e)}${e.links&&e.links.github&&e.links.github!=='#'?`<p style="margin-top:20px"><a class="btn fill" href="${e.links.github}" target="_blank" rel="noopener">Xem mã nguồn</a></p>`:''}</div>`}
+
 // ===== Router: #/projects, #/project/<slug> =====
 const view=$("view");
 const homeEls=()=>document.querySelectorAll("header.hero,section");
@@ -587,7 +606,7 @@ function pageDetail(slug){const i=P.findIndex(p=>p.slug===slug);if(i<0)return pa
  <div class="pn"><a class="btn line" href="#/project/${pv.slug}">← ${pv.title}</a><a class="btn line" href="#/project/${nx.slug}">${nx.title} →</a></div></div>`}
 function route(){const hs=location.hash;const sub=hs.startsWith("#/");
  homeEls().forEach(e=>e.hidden=sub);view.hidden=!sub;
- if(sub){hs.startsWith("#/lab")?pageLab():hs.startsWith("#/login")?pageLogin():hs.startsWith("#/admin")?pageAdmin():hs.startsWith("#/project/")?pageDetail(decodeURIComponent(hs.slice(10))):hs.startsWith("#/article/")?pageArticle(decodeURIComponent(hs.slice(10))):hs.startsWith("#/articles")?pageArticles():pageProjects();initSlots();paint();window.scrollTo(0,0)}
+ if(sub){hs.startsWith("#/lab/")?pageLabItem(decodeURIComponent(hs.slice(6))):hs.startsWith("#/lab")?pageLab():hs.startsWith("#/login")?pageLogin():hs.startsWith("#/admin")?pageAdmin():hs.startsWith("#/project/")?pageDetail(decodeURIComponent(hs.slice(10))):hs.startsWith("#/article/")?pageArticle(decodeURIComponent(hs.slice(10))):hs.startsWith("#/articles")?pageArticles():pageProjects();initSlots();paint();window.scrollTo(0,0)}
  else{const el=hs.length>1&&document.querySelector(hs);if(el)setTimeout(()=>el.scrollIntoView(),0);else window.scrollTo(0,0)}}
 addEventListener("hashchange",route);route();
 
