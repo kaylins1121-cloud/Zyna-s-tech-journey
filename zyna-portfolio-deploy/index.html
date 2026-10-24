@@ -443,7 +443,7 @@ const toForm=(k,o)=>k==="l"?toFormL(o):k==="p"?{title:o.title,cat:o.cat,year:o.y
 const fromForm=(k,f)=>k==="l"?fromFormL(f):k==="p"?{title:f.title,cat:f.cat||"Khác",year:+f.year||new Date().getFullYear(),tags:f.tags.split(",").map(x=>x.trim()).filter(Boolean),summary:f.summary,problem:f.problem,method:lines(f.method),results:lines(f.results).map(l=>{const r=l.split("|").map(x=>x.trim());return[r[0],r[1]||""]}),links:{github:f.github||"#",report:f.report||"#"}}:{title:f.title,cat:f.cat||"Khác",date:f.date,excerpt:f.excerpt,body:textToBody(f.body)};
 function refresh(){renderHome();initSlots();paint()}
 // ===== Supabase (điền URL + anon key khi deploy ở Phase 9; để trống = dùng lưu trữ tạm) =====
-const SB={url:"",key:""};const sbOn=!!(SB.url&&SB.key);let sbToken=null;
+const SB={url:"https://gafkreajziusrzmbmzth.supabase.co",key:"sb_publishable_zjGvyDE-PlCzppUj8l5ABg_-_wWv3oS"};const sbOn=!!(SB.url&&SB.key);let sbToken=null;
 const sbH=(x={})=>({apikey:SB.key,...((sbToken||SB.key.startsWith('eyJ'))?{Authorization:'Bearer '+(sbToken||SB.key)}:{}),'Content-Type':'application/json',...x});
 const sbGet=t=>fetch(`${SB.url}/rest/v1/${t}`,{headers:sbH()}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()});
 async function sbSync(t,L){const r=await fetch(`${SB.url}/rest/v1/${t}`,{method:"POST",headers:sbH({Prefer:"resolution=merge-duplicates"}),body:JSON.stringify(L.map((o,i)=>({...o,sort:L.length-i})))});if(!r.ok)throw new Error(r.status);
