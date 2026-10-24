@@ -175,6 +175,8 @@ body.edit .heroimg{z-index:5}
 .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}.mgrid img,.mgrid video{width:100%;border-radius:14px;background:#000;aspect-ratio:16/10;object-fit:cover}
 .off{display:none!important}.glass,.photo,.lab,.cover{border-radius:var(--r,22px)!important}
 .form select{font:inherit;font-size:.9rem;padding:10px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);width:100%}.form input[type=color]{height:44px;padding:4px}
+.labgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px}.labc{padding:20px}.labc h2{font-size:1.1rem;margin-bottom:4px}.labc p{font-size:.85rem;color:var(--muted);margin-bottom:12px}.labc canvas{width:100%;height:auto;border-radius:12px;background:var(--bg2)}
+.sl{display:grid;gap:8px;margin-top:12px}.sl label{font-size:.82rem;display:grid;grid-template-columns:90px 1fr 40px;gap:8px;align-items:center}.stat{display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin-top:10px}.stat b{color:var(--pink)}
 .sample{font-size:.75rem;color:var(--muted);margin-top:30px}
 @media(max-width:860px){.cols{grid-template-columns:1fr}}
 
@@ -202,7 +204,7 @@ body.edit .heroimg{z-index:5}
 <nav><div class="wrap">
   <a class="logo" href="#home"><i></i>ZYNA</a>
   <div class="links" id="links">
-    <a href="#home" class="on">Home</a><a href="#about">About</a><a href="#journey">Journey</a><a href="#/projects">Projects</a><a href="#skills">Skills</a><a href="#lab">Lab</a><a href="#/articles">Articles</a><a href="#contact">Contact</a>
+    <a href="#home" class="on">Home</a><a href="#about">About</a><a href="#journey">Journey</a><a href="#/projects">Projects</a><a href="#skills">Skills</a><a href="#/lab">Lab</a><a href="#/articles">Articles</a><a href="#contact">Contact</a>
   </div>
   <div class="tools"><button id="theme" aria-label="Đổi giao diện sáng/tối">Dark</button><button id="lang">EN</button><a href="#contact">Resume</a></div>
 </div></nav>
@@ -257,7 +259,7 @@ body.edit .heroimg{z-index:5}
   <div id="articles-wrap-lab">
     <h2>My Lab / Experiments</h2><p class="sub">Nơi mình thử ý tưởng và xây những thứ thú vị.</p>
     <div class="lab" data-slot="lab"><ul><li>MATLAB Simulation</li><li>COMSOL</li><li>Arduino &amp; Sensors</li><li>Embedded Systems</li><li>PyTorch Experiments</li></ul></div>
-    <a class="btn line" style="margin-top:16px" href="#lab">Vào phòng lab</a>
+    <a class="btn line" style="margin-top:16px" href="#/lab">Vào phòng lab</a>
   </div>
   <div id="articles">
     <h2>Articles &amp; Notes</h2><p class="sub">Suy nghĩ, bài học và cập nhật công nghệ.</p>
@@ -442,7 +444,7 @@ const fromForm=(k,f)=>k==="p"?{title:f.title,cat:f.cat||"Khác",year:+f.year||ne
 function refresh(){renderHome();initSlots();paint()}
 // ===== Supabase (điền URL + anon key khi deploy ở Phase 9; để trống = dùng lưu trữ tạm) =====
 const SB={url:"",key:""};const sbOn=!!(SB.url&&SB.key);let sbToken=null;
-const sbH=(x={})=>({apikey:SB.key,Authorization:"Bearer "+(sbToken||SB.key),"Content-Type":"application/json",...x});
+const sbH=(x={})=>({apikey:SB.key,...((sbToken||SB.key.startsWith('eyJ'))?{Authorization:'Bearer '+(sbToken||SB.key)}:{}),'Content-Type':'application/json',...x});
 const sbGet=t=>fetch(`${SB.url}/rest/v1/${t}`,{headers:sbH()}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()});
 async function sbSync(t,L){const r=await fetch(`${SB.url}/rest/v1/${t}`,{method:"POST",headers:sbH({Prefer:"resolution=merge-duplicates"}),body:JSON.stringify(L.map((o,i)=>({...o,sort:L.length-i})))});if(!r.ok)throw new Error(r.status);
  const ids=L.map(o=>o.id),rows=await sbGet(t+"?select=id"),gone=rows.map(x=>x.id).filter(id=>!ids.includes(id));
@@ -534,6 +536,37 @@ function pageAppearance(){const a=app;a.order=fullOrder();a.sections=a.sections|
  $('ft').onchange=e=>{app.font=e.target.value;applyApp()};$('rd').oninput=e=>{app.radius=+e.target.value;$('rv').textContent=e.target.value;applyApp()};
  $('sv').onclick=saveApp;$('rs').onclick=()=>{app=JSON.parse(appSaved);applyApp();pageAppearance()};$('df').onclick=()=>{app=JSON.parse(JSON.stringify(APP0));applyApp();pageAppearance()}}
 
+// ===== Phòng Lab: mô phỏng tương tác =====
+let labRaf=0;
+const mk=(id,l,a,b,s,v)=>`<label>${l}<input type="range" id="${id}" min="${a}" max="${b}" step="${s}" value="${v}"><output id="${id}o">${v}</output></label>`;
+const cv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function pageLab(){cancelAnimationFrame(labRaf);
+ view.innerHTML=`<div class="wrap pg"><a class="back" href="#home">← Trang chủ</a><h1>My Lab / Experiments</h1><p class="lead">Các mô phỏng tương tác chạy ngay trên trình duyệt — kéo thanh trượt để xem hệ thống phản ứng.</p><div class="labgrid">
+<div class="glass labc"><h2>Bộ điều khiển PID</h2><p>Hệ khối lượng–lò xo–giảm chấn bám theo giá trị đặt (nét đứt). Đường hồng là đầu ra.</p><canvas id="pidc" width="640" height="260"></canvas><div class="sl">${mk('kp','Kp',0,20,0.1,6)}${mk('ki','Ki',0,20,0.1,2)}${mk('kd','Kd',0,10,0.1,2.5)}</div><div class="stat" id="pids"></div></div>
+<div class="glass labc"><h2>Gradient Descent</h2><p>Tối ưu hàm loss dạng bát bầu dục. Thử tăng learning rate đến khi phân kỳ, hoặc thêm momentum.</p><canvas id="gdc" width="640" height="260"></canvas><div class="sl">${mk('lr','Learning rate',0.01,0.25,0.01,0.05)}${mk('mo','Momentum',0,0.95,0.05,0)}<button class="mini pink" id="gdr" style="justify-self:start">Chạy lại</button></div><div class="stat" id="gds"></div></div></div></div>`;
+ const pc=$('pidc'),px=pc.getContext('2d');
+ const runPid=()=>{const kp=+$('kp').value,ki=+$('ki').value,kd=+$('kd').value;['kp','ki','kd'].forEach(i=>$(i+'o').textContent=$(i).value);
+  const dt=.01,N=1000;let x=0,v=0,I=0,pe=1;const ys=[];
+  for(let n=0;n<N;n++){const e=1-x;I=Math.max(-20,Math.min(20,I+e*dt));const d=(e-pe)/dt;pe=e;const u=Math.max(-50,Math.min(50,kp*e+ki*I+kd*d));v+=(u-v-2*x)*dt;x+=v*dt;x=Math.max(-10,Math.min(10,x));ys.push(x)}
+  const W=pc.width,H=pc.height,mx=Math.max(1.5,Math.min(4,Math.max(...ys)*1.1)),Y=q=>H-24-(q/mx)*(H-40),X=n=>10+n/N*(W-20);
+  px.clearRect(0,0,W,H);px.lineWidth=1;px.strokeStyle=cv('--line');px.beginPath();px.moveTo(10,Y(0));px.lineTo(W-10,Y(0));px.stroke();
+  px.setLineDash([6,5]);px.strokeStyle=cv('--muted');px.beginPath();px.moveTo(10,Y(1));px.lineTo(W-10,Y(1));px.stroke();px.setLineDash([]);
+  px.fillStyle=cv('--muted');px.font='12px sans-serif';px.fillText('0 s',10,H-6);px.fillText('10 s',W-36,H-6);px.fillText('giá trị đặt = 1',14,Y(1)-6);
+  px.strokeStyle=cv('--pink');px.lineWidth=2.5;px.beginPath();ys.forEach((q,n)=>n?px.lineTo(X(n),Y(q)):px.moveTo(X(n),Y(q)));px.stroke();
+  let st=0;for(let n=N-1;n>=0;n--)if(Math.abs(ys[n]-1)>.02){st=(n+1)*dt;break}
+  $('pids').innerHTML=`Vọt lố: <b>${(Math.max(0,Math.max(...ys)-1)*100).toFixed(1)}%</b> · Thời gian xác lập (2%): <b>${st>=9.99?'>10':st.toFixed(2)} s</b> · Sai số xác lập: <b>${Math.abs(1-ys[N-1]).toFixed(3)}</b>`};
+ ['kp','ki','kd'].forEach(i=>$(i).oninput=runPid);runPid();
+ const gc=$('gdc'),gx=gc.getContext('2d'),GW=gc.width,GH=gc.height,gX=a=>(a+5)/10*GW,gY=b=>(4-b)/8*GH;
+ const drawGd=path=>{gx.clearRect(0,0,GW,GH);gx.save();gx.beginPath();gx.rect(0,0,GW,GH);gx.clip();gx.strokeStyle=cv('--line');gx.lineWidth=1;
+  [.5,2,5,10,20,40].forEach(f=>{gx.beginPath();gx.ellipse(gX(0),gY(0),Math.sqrt(2*f)*GW/10,Math.sqrt(2*f/10)*GH/8,0,0,7);gx.stroke()});
+  gx.strokeStyle=cv('--pink');gx.lineWidth=2;gx.beginPath();path.forEach((p,i)=>i?gx.lineTo(gX(p[0]),gY(p[1])):gx.moveTo(gX(p[0]),gY(p[1])));gx.stroke();
+  const l=path[path.length-1];gx.fillStyle=cv('--pink');gx.beginPath();gx.arc(gX(l[0]),gY(l[1]),5,0,7);gx.fill();gx.fillStyle=cv('--muted');gx.beginPath();gx.arc(gX(0),gY(0),3,0,7);gx.fill();gx.restore()};
+ const startGd=()=>{cancelAnimationFrame(labRaf);const lr=+$('lr').value,mo=+$('mo').value;$('lro').textContent=lr;$('moo').textContent=mo;let p=[-4,3],vv=[0,0],it=0;const path=[p.slice()];
+  const step=()=>{if(!$('gdc'))return;for(let k=0;k<2;k++){vv=[mo*vv[0]-lr*p[0],mo*vv[1]-lr*10*p[1]];p=[p[0]+vv[0],p[1]+vv[1]];it++;path.push(p.slice())}
+   drawGd(path);const L=.5*(p[0]*p[0]+10*p[1]*p[1]);$('gds').innerHTML=`Vòng lặp: <b>${it}</b> · Loss: <b>${isFinite(L)&&L<1e6?L.toExponential(2):'phân kỳ'}</b>`;
+   if(isFinite(L)&&L<1e6&&L>1e-4&&it<400)labRaf=requestAnimationFrame(step)};step()};
+ $('lr').onchange=$('mo').onchange=$('gdr').onclick=startGd;$('lr').oninput=()=>$('lro').textContent=$('lr').value;$('mo').oninput=()=>$('moo').textContent=$('mo').value;startGd()}
+
 // ===== Router: #/projects, #/project/<slug> =====
 const view=$("view");
 const homeEls=()=>document.querySelectorAll("header.hero,section");
@@ -554,7 +587,7 @@ function pageDetail(slug){const i=P.findIndex(p=>p.slug===slug);if(i<0)return pa
  <div class="pn"><a class="btn line" href="#/project/${pv.slug}">← ${pv.title}</a><a class="btn line" href="#/project/${nx.slug}">${nx.title} →</a></div></div>`}
 function route(){const hs=location.hash;const sub=hs.startsWith("#/");
  homeEls().forEach(e=>e.hidden=sub);view.hidden=!sub;
- if(sub){hs.startsWith("#/login")?pageLogin():hs.startsWith("#/admin")?pageAdmin():hs.startsWith("#/project/")?pageDetail(decodeURIComponent(hs.slice(10))):hs.startsWith("#/article/")?pageArticle(decodeURIComponent(hs.slice(10))):hs.startsWith("#/articles")?pageArticles():pageProjects();initSlots();paint();window.scrollTo(0,0)}
+ if(sub){hs.startsWith("#/lab")?pageLab():hs.startsWith("#/login")?pageLogin():hs.startsWith("#/admin")?pageAdmin():hs.startsWith("#/project/")?pageDetail(decodeURIComponent(hs.slice(10))):hs.startsWith("#/article/")?pageArticle(decodeURIComponent(hs.slice(10))):hs.startsWith("#/articles")?pageArticles():pageProjects();initSlots();paint();window.scrollTo(0,0)}
  else{const el=hs.length>1&&document.querySelector(hs);if(el)setTimeout(()=>el.scrollIntoView(),0);else window.scrollTo(0,0)}}
 addEventListener("hashchange",route);route();
 
